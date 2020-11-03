@@ -29,9 +29,10 @@ const deque<string>& InvertedIndex::GetDocuments() const {
 }
 
 const vector<InvertedIndex::Item>& InvertedIndex::Lookup(string_view word) const {
-  if (auto it = index.find(word); it != index.end()) {
-    return it->second;
-  } else {
-    return {};
-  }
+  static const vector<Item> empty;
+    if (auto it = index.find(word); it != index.end()) {
+        return it->second;
+    } else {
+        return empty;
+    }
 }

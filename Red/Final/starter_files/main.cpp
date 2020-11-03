@@ -21,14 +21,13 @@ void TestFunctionality(
 ) {
   istringstream docs_input(Join('\n', docs));
   istringstream queries_input(Join('\n', queries));
-
   SearchServer srv;
   srv.UpdateDocumentBase(docs_input);
   ostringstream queries_output;
   srv.AddQueriesStream(queries_input, queries_output);
-
   const string result = queries_output.str();
   const auto lines = SplitBy(Strip(result), '\n');
+
   ASSERT_EQUAL(lines.size(), expected.size());
   for (size_t i = 0; i < lines.size(); ++i) {
     ASSERT_EQUAL(lines[i], expected[i]);
@@ -49,7 +48,6 @@ void TestSerpFormat() {
       "{docid: 1, hitcount: 1}"
     })
   };
-
   TestFunctionality(docs, queries, expected);
 }
 
@@ -204,11 +202,16 @@ void TestBasicSearch() {
 int main() {
   TestRunner tr;
   LOG_DURATION("Single lock");
-  for (int i=0; i<5000; i++) {
-    RUN_TEST(tr, TestSerpFormat);
-    RUN_TEST(tr, TestTop5);
-    RUN_TEST(tr, TestHitcount);
-    RUN_TEST(tr, TestRanking);
-    RUN_TEST(tr, TestBasicSearch);
-  }  
+  RUN_TEST(tr, TestTop5);
+  // RUN_TEST(tr, TestHitcount);
+  // RUN_TEST(tr, TestRanking);
+  // RUN_TEST(tr, TestBasicSearch);
+  // RUN_TEST(tr, TestSerpFormat);
+  // for (int i=0; i<5000; i++) {
+  //   RUN_TEST(tr, TestSerpFormat);
+  //   RUN_TEST(tr, TestTop5);
+  //   RUN_TEST(tr, TestHitcount);
+  //   RUN_TEST(tr, TestRanking);
+  //   RUN_TEST(tr, TestBasicSearch);
+  // }  
 }
