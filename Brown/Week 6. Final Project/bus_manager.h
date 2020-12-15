@@ -32,8 +32,27 @@ public:
             out_stream << "Bus " << routeNumber << ": not found";
         }
 
-    return out_stream.str();
-  }
+        return out_stream.str();
+    }
+
+    std::string stationInfo(const std::string& stationName) {
+        std::ostringstream out_stream;
+        if (stations_.count(stationName)) {
+            const auto& buses = stations_.at(stationName).buses_;
+            if (buses.empty()) {
+                out_stream << "Stop " << stationName << ": no buses";
+            } else {
+                out_stream << "Stop " << stationName << ": buses";
+                for (const auto& bus : buses) {
+                    out_stream << " " << bus;
+                }
+            }
+        } else {
+            out_stream << "Stop " << stationName << ": not found";
+        }
+        return out_stream.str();
+    }
+
 
 private:
     std::unordered_map<std::string, Station> stations_;

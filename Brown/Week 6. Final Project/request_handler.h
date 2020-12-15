@@ -7,6 +7,7 @@
 
 #include <string_view>
 #include <iostream>
+#include <string>
 
 
 
@@ -60,16 +61,24 @@ BusManager buildDataBase(std::istream& inStream = std::cin) {
     for (int i = 0; i < requestCnt; ++i) {
         std::string requestType;
         inStream >> requestType;
+        std::string strToParse;
+        getline(inStream, strToParse);
         if (requestType == "Stop") {
-            std::string strToParse;
-            getline(inStream, strToParse);
             auto station = buildStation(strToParse);
-            stations[station.name_] = std::move(station);
+            if (stations.count(station.name_)) {
+                stations[station.name_].lat_ = station.lat_;
+                stations[station.name_].lon_ = station.lon_;
+                stations[station.name_].name_ = std::move(station.name_);
+            } else {
+                stations[station.name_] = std::move(station);
+            }
         } else if (requestType == "Bus") {
-            std::string strToParse;
-            getline(inStream, strToParse);
             auto busRoute = buildRoute(strToParse);
-            routes.insert({busRoute.routeNumber(), std::move(busRoute)});
+            auto routeNumber = busRoute.routeNumber();
+            for (const auto& stopName : busRoute.stationNames()) {
+                stations[stopName].buses_.insert(routeNumber);
+            }
+            routes.insert({routeNumber, std::move(busRoute)});
         }
     }
 
@@ -88,11 +97,14 @@ void processRequests(BusManager& manager,
     int requestCnt = 0;
     inStream >> requestCnt;
     for (int i = 0; i < requestCnt; ++i) {
+        std::string requestType;
+        inStream >> requestType;
         std::string strToParse;
         getline(inStream, strToParse);
-        if (strToParse.empty()) {
-            getline(inStream, strToParse);
+        if (requestType == "Bus") {
+            outStream << manager.routeInfo(parseRequest(strToParse)) << std::endl;
+        } else if (requestType == "Stop") {
+            outStream << manager.stationInfo(parseRequest(strToParse)) << std::endl;
         }
-        outStream << manager.routeInfo(parseRequest(strToParse)) << std::endl;
     }
 }
