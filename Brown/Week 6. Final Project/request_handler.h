@@ -8,23 +8,50 @@
 #include <string_view>
 #include <iostream>
 #include <string>
+#include <unordered_map>
+
+
+std::unordered_map<std::string, size_t> parseDistanceToStation(std::string_view str, char sep = ',') {
+    std::unordered_map<std::string, size_t> result;
+    while (!str.empty()) {
+        auto pos = str.find('m');
+        size_t distance = stoull(std::string(str.substr(0, pos)));
+        str.remove_prefix(pos + 5);
+
+        pos = str.find(sep);
+        std::string stationName = std::string(str.substr(0, pos));
+
+        str.remove_prefix(pos != str.npos ? pos + 2 : str.size());
+        result.emplace(move(stationName), distance);
+    }
+
+    return result;
+}
 
 
 
 Station buildStation(std::string_view str) {
     Station station;
-    str.remove_prefix(str.find_first_not_of(" "));
+    str.remove_prefix(str.find_first_not_of(' '));
 
-    auto pos = str.find_first_of(":");
+    auto pos = str.find_first_of(':');
     station.name_ = str.substr(0, pos);
 
     str.remove_prefix(pos + 2);
-    pos = str.find_first_of(",");
+    pos = str.find_first_of(',');
     station.lat_ = stod(std::string(str.substr(0, pos)));
 
-    pos = str.find_first_of(" ");
+    pos = str.find_first_of(' ');
     str.remove_prefix(++pos);
-    station.lon_ = stod(std::string(str.substr(0)));
+
+    pos = str.find_first_of(',');
+    if (pos != str.npos) {
+        station.lon_ = stod(std::string(str.substr(0, pos)));
+        str.remove_prefix(pos + 2);
+        station.distanceToStations_ = move(parseDistanceToStation(str));
+    } else {
+        station.lon_ = stod(std::string(str.substr(0)));
+    }
 
     return station;
 }
@@ -68,6 +95,7 @@ BusManager buildDataBase(std::istream& inStream = std::cin) {
             if (stations.count(station.name_)) {
                 stations[station.name_].lat_ = station.lat_;
                 stations[station.name_].lon_ = station.lon_;
+                stations[station.name_].distanceToStations_ = move(station.distanceToStations_);
                 stations[station.name_].name_ = std::move(station.name_);
             } else {
                 stations[station.name_] = std::move(station);

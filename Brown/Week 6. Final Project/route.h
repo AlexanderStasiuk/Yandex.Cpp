@@ -12,7 +12,10 @@ public:
 
     size_t uniqueStationsCount() const;
 
-    std::optional<double> routeLength() const;
+    std::optional<size_t> lengthByRealRoads() const;
+
+    std::optional<double> curvature() const;
+
 
     const std::vector<std::string>& stationNames() const;
 
@@ -20,11 +23,14 @@ public:
 
     std::string routeNumber() const;
 
-    void setLength(double length);
+    void setRouteLengthByRealRoads(size_t length);
+
+    void setCurvature(double curvature);
 
 private:
     std::string number_;
     bool isRing_;
     std::vector<std::string> stationNames_;
-    std::optional<double> length_;
+    std::optional<size_t> length_;
+    std::optional<double> curvature_;
 };
