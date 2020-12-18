@@ -30,68 +30,40 @@ std::unordered_map<std::string, size_t> parseDistanceToStation(std::string_view 
 
 
 
-Station buildStation(std::string_view str) {
+Station buildStation(const std::map<std::string, Json::Node>& reqMap) {
     Station station;
-    str.remove_prefix(str.find_first_not_of(' '));
-
-    auto pos = str.find_first_of(':');
-    station.name_ = str.substr(0, pos);
-
-    str.remove_prefix(pos + 2);
-    pos = str.find_first_of(',');
-    station.lat_ = stod(std::string(str.substr(0, pos)));
-
-    pos = str.find_first_of(' ');
-    str.remove_prefix(++pos);
-
-    pos = str.find_first_of(',');
-    if (pos != str.npos) {
-        station.lon_ = stod(std::string(str.substr(0, pos)));
-        str.remove_prefix(pos + 2);
-        station.distanceToStations_ = move(parseDistanceToStation(str));
-    } else {
-        station.lon_ = stod(std::string(str.substr(0)));
+    station.name_ = reqMap.at("name").AsString();
+    station.lat_ = reqMap.at("latitude").AsDouble();
+    station.lon_ = reqMap.at("longitude").AsDouble();
+    const auto& distancesToStations = reqMap.at("road_distances").AsMap();
+    for (const auto& elem : distancesToStations) {
+        station.distanceToStations_.emplace(elem.first, elem.second.AsInt());
     }
 
     return station;
 }
 
-Route buildRoute(std::string_view str) {
-    str.remove_prefix(str.find_first_not_of(" "));
-
-    auto pos = str.find_first_of(":");
-    std::string routeNumber = std::string(str.substr(0, pos));
-
-    str.remove_prefix(pos + 2);
-
-    std::string separator;
-    bool isRing;
-    pos = str.find("-");
-    if (pos != str.npos) {
-        separator = " - ";
-        isRing = false;
-    } else {
-        separator = " > ";
-        isRing = true;
+Route buildRoute(const std::map<std::string, Json::Node>& reqMap) {
+    auto routeNumber = reqMap.at("name").AsString();
+    auto isRing = reqMap.at("is_roundtrip").AsBool();
+    const auto& stations = reqMap.at("stops").AsArray();
+    std::vector<std::string> stationNames;
+    for (const auto& station : stations) {
+        stationNames.push_back(station.AsString());
     }
-    auto stationNames = splitBy(str, separator);
 
     return Route(routeNumber, isRing, std::move(stationNames));
 }
 
-BusManager buildDataBase(std::istream& inStream = std::cin) {
+BusManager buildDataBase(const std::vector<Json::Node>& requests) {
     std::unordered_map<std::string, Station> stations;
     std::unordered_map<std::string, Route> routes;
 
-    int requestCnt = 0;
-    inStream >> requestCnt;
-    for (int i = 0; i < requestCnt; ++i) {
-        std::string requestType;
-        inStream >> requestType;
-        std::string strToParse;
-        getline(inStream, strToParse);
+    for (const auto& req : requests) {
+        const auto& reqMap = req.AsMap();
+        const auto& requestType = reqMap.at("type").AsString();
         if (requestType == "Stop") {
-            auto station = buildStation(strToParse);
+            auto station = buildStation(reqMap);
             if (stations.count(station.name_)) {
                 stations[station.name_].lat_ = station.lat_;
                 stations[station.name_].lon_ = station.lon_;
@@ -101,10 +73,10 @@ BusManager buildDataBase(std::istream& inStream = std::cin) {
                 stations[station.name_] = std::move(station);
             }
         } else if (requestType == "Bus") {
-            auto busRoute = buildRoute(strToParse);
+            auto busRoute = buildRoute(reqMap);
             auto routeNumber = busRoute.routeNumber();
-            for (const auto& stopName : busRoute.stationNames()) {
-                stations[stopName].buses_.insert(routeNumber);
+            for (const auto& stationName : busRoute.stationNames()) {
+                stations[stationName].buses_.insert(routeNumber);
             }
             routes.insert({routeNumber, std::move(busRoute)});
         }
@@ -119,20 +91,56 @@ std::string parseRequest(std::string_view str) {
 }
 
 void processRequests(BusManager& manager,
-                     std::istream& inStream = std::cin,
+                     const std::vector<Json::Node>& requests,
                      std::ostream& outStream = std::cout) {
     outStream.precision(6);
-    int requestCnt = 0;
-    inStream >> requestCnt;
-    for (int i = 0; i < requestCnt; ++i) {
-        std::string requestType;
-        inStream >> requestType;
-        std::string strToParse;
-        getline(inStream, strToParse);
-        if (requestType == "Bus") {
-            outStream << manager.routeInfo(parseRequest(strToParse)) << std::endl;
-        } else if (requestType == "Stop") {
-            outStream << manager.stationInfo(parseRequest(strToParse)) << std::endl;
+    outStream << "[";
+    for (size_t i = 0; i < requests.size(); ++i) {
+        const auto& reqMap = requests[i].AsMap();
+        const auto& type = reqMap.at("type").AsString();
+        outStream << "{";
+        outStream << "\"request_id\": " << reqMap.at("id").AsInt() << ", ";
+        if (type == "Bus") {
+            const auto routeInfo = manager.routeInfo(reqMap.at("name").AsString());
+            if (routeInfo.count("error_message")) {
+                outStream << "\"error_message\": "
+                        << "\"" << routeInfo.at("error_message").AsString() << "\"";
+            } else {
+                outStream << "\"route_length\": "
+                        << routeInfo.at("route_length").AsInt() << ", ";
+                outStream << "\"curvature\": " << routeInfo.at("curvature").AsDouble()
+                        << ", ";
+                outStream << "\"stop_count\": " << routeInfo.at("stop_count").AsInt()
+                        << ", ";
+                outStream << "\"unique_stop_count\": "
+                        << routeInfo.at("unique_stop_count").AsInt();
+            }
+
+        } else if (type == "Stop") {
+            const auto stationInfo = manager.stationInfo(reqMap.at("name").AsString());
+            if (stationInfo.count("error_message")) {
+                outStream << "\"error_message\": "
+                        << "\"" << stationInfo.at("error_message").AsString() << "\"";
+            } else {
+                outStream << "\"buses\": [";
+                const auto& buses = stationInfo.at("buses").AsArray();
+                for (size_t i = 0; i < buses.size(); ++i) {
+                    if (i < buses.size() - 1) {
+                        outStream << "\"" << buses[i].AsString() << "\", ";
+                    } else {
+                        outStream << "\"" << buses[i].AsString() << "\"";
+                    }
+                }
+                outStream << "]";
+            }
+        }
+
+        if (i < requests.size() - 1) {
+            outStream << "}, ";
+        } else {
+            outStream << "}";
         }
     }
+
+    outStream << "]";
 }

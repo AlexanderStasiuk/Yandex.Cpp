@@ -3,6 +3,7 @@
 #include "station.h"
 #include "route.h"
 #include "utils.h"
+#include "json.h"
 
 // #include <iostream>
 #include <sstream>
@@ -14,9 +15,9 @@ public:
     BusManager(std::unordered_map<std::string, Station> stations, std::unordered_map<std::string, Route> routes)
       : stations_(move(stations)), routes_(move(routes)) {}
 
-    std::string routeInfo(const std::string& routeNumber) {
+    std::unordered_map<std::string, Json::Node> routeInfo(const std::string& routeNumber) {
 
-        std::ostringstream out_stream;
+        std::unordered_map<std::string, Json::Node> result;
 
         if (routes_.count(routeNumber)) {
             auto stops = routes_.at(routeNumber).stationsCount();
@@ -32,33 +33,33 @@ public:
                 routes_.at(routeNumber).setCurvature(curvature);
             }
 
-            out_stream << "Bus " << routeNumber << ": " << stops
-                        << " stops on route, " << uniqueStops << " unique stops, "
-                        << *routes_.at(routeNumber).lengthByRealRoads() << " route length, "
-                        << *routes_.at(routeNumber).curvature() << " curvature";
+            result["route_length"] = Json::Node(static_cast<int>(*routes_.at(routeNumber).lengthByRealRoads()));
+            result["curvature"] = Json::Node(*routes_.at(routeNumber).curvature());
+            result["stop_count"] = Json::Node(static_cast<int>(stops));
+            result["unique_stop_count"] = Json::Node(static_cast<int>(uniqueStops));
         } else {
-            out_stream << "Bus " << routeNumber << ": not found";
+            result["error_message"] = Json::Node(std::string("not found"));
         }
 
-        return out_stream.str();
+        return result;
     }
 
-    std::string stationInfo(const std::string& stationName) {
-        std::ostringstream out_stream;
+    std::unordered_map<std::string, Json::Node> stationInfo(const std::string& stationName) {
+        std::unordered_map<std::string, Json::Node> result;
+
         if (stations_.count(stationName)) {
             const auto& buses = stations_.at(stationName).buses_;
-            if (buses.empty()) {
-                out_stream << "Stop " << stationName << ": no buses";
-            } else {
-                out_stream << "Stop " << stationName << ": buses";
-                for (const auto& bus : buses) {
-                    out_stream << " " << bus;
-                }
+            std::vector<Json::Node> busesForStations;
+            for (const auto& bus : buses) {
+                busesForStations.push_back(Json::Node(bus));
             }
+
+            result["buses"] = Json::Node(busesForStations);
         } else {
-            out_stream << "Stop " << stationName << ": not found";
+            result["error_message"] = Json::Node(std::string("not found"));
         }
-        return out_stream.str();
+
+        return result;
     }
 
 
